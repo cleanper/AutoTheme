@@ -31,7 +31,7 @@ jobs:
         run: |
           DATE=$(date +%Y%m%d)
           COUNT=$(gh api "repos/${{ github.repository }}/actions/runs?created=$(date +%Y-%m-%d)&status=success" --paginate -q '[.workflow_runs[]|select(.name=="build-release")]|length')
-          VERSION="AutoTheme+Build.${DATE}.${COUNT}"
+          VERSION="Build.${DATE}.${COUNT}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
@@ -42,8 +42,8 @@ jobs:
       - run: git archive --format=zip --output="AutoTheme+${{ env.VERSION }}-Source.zip" HEAD
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION }}
-          name: ${{ env.VERSION }}
+          tag_name: AutoTheme+${{ env.VERSION }}
+          name: AutoTheme+${{ env.VERSION }}
           files: |
             AutoTheme+${{ env.VERSION }}.zip
             AutoTheme+${{ env.VERSION }}-Source.zip
