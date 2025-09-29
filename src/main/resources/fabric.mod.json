@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "autotheme",
+	"version": "1.0.0",
+	"name": "AutoTheme",
+	"description": "自适应系统主题",
+	"authors": ["YL"],
+	"license": "LGPL-3.0",
+	"icon": "Logo.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["net.auto.theme.AutoThemeLoader"]
+	},
+	"mixins": [
+		"autotheme.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.17.2",
+		"minecraft": ["1.21","1.21.1"],
+		"java": ">=21"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
