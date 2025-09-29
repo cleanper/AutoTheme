@@ -31,7 +31,7 @@ jobs:
         run: |
           DATE=$(date +%Y%m%d)
           COUNT=$(gh api "repos/${{ github.repository }}/actions/runs?created=$(date +%Y-%m-%d)&status=success" --paginate -q '[.workflow_runs[]|select(.name=="build-release")]|length')
-          VERSION="AutoTheme+AutoTheme+Build.${DATE}.${COUNT}"
+          VERSION="AutoTheme+Build.${DATE}.${COUNT}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
