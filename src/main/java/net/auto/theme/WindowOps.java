@@ -9,22 +9,51 @@ import com.sun.jna.win32.W32APIOptions;
 import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
 
+@SuppressWarnings("ResultOfMethodCallIgnored") // 忽略getPointer结果
 public final class WindowOps {
     private static boolean lastDark = !AutoTheme.dark(); // 强制第一次刷新
+    private static long lastHandle = 0;
+
+    private static final IntByReference TRUE_REF = new IntByReference(1);
+    private static final IntByReference FALSE_REF = new IntByReference(0);
+    private static final WinDef.DWORD ATTRIBUTE = new WinDef.DWORD(20L); // DWMWA_USE_IMMERSIVE_DARK_MODE
+    private static final WinDef.DWORD SIZE = new WinDef.DWORD(4L);
+
+    static {
+        TRUE_REF.getPointer();
+        FALSE_REF.getPointer();
+    }
 
     public static void apply(Window w) {
+        applyTheme(w, true);
+    }
+
+    // 只在主题变化时应用
+    public static void applyIfNeeded(Window w) {
+        applyTheme(w, false);
+    }
+
+    private static void applyTheme(Window w, boolean force) {
         boolean dark = AutoTheme.dark();
-        if (dark == lastDark) return;
+
+        if (!force && dark == lastDark) {
+            return;
+        }
         lastDark = dark;
 
         long hwnd = GLFWNativeWin32.glfwGetWin32Window(w.getHandle());
-        // 申请 4 字节 native 内存，值为 1 或 0
-        IntByReference ref = new IntByReference(dark ? 1 : 0);
+
+        if (hwnd != lastHandle) {
+            lastHandle = hwnd;
+        }
+
+        IntByReference ref = dark ? TRUE_REF : FALSE_REF;
         DwmApi.INSTANCE.DwmSetWindowAttribute(
                 new WinDef.HWND(new Pointer(hwnd)),
-                new WinDef.DWORD(20L), // DWMWA_USE_IMMERSIVE_DARK_MODE
+                ATTRIBUTE,
                 ref.getPointer(),
-                new WinDef.DWORD(4L));
+                SIZE);
+        // System.out.println("窗口主题已应用: " + (dark ? "深色模式" : "浅色模式"));
     }
 
     private interface DwmApi extends StdCallLibrary {

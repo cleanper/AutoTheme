@@ -6,7 +6,20 @@ final class AutoTheme {
     }
     private static native boolean dark0(); // JNI 入口
 
+    private static long lastCheckTime = 0;
+    private static boolean cachedResult = false;
+    private static final long CHECK_INTERVAL = 100; // 0.1秒检测间隔
+
     static boolean dark() {
-        return dark0();
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastCheckTime > CHECK_INTERVAL) {
+            boolean newResult = dark0();
+            if (newResult != cachedResult) {
+                // System.out.println("AutoTheme.dark() = " + newResult); // 控制台验证
+            }
+            cachedResult = newResult;
+            lastCheckTime = currentTime;
+        }
+        return cachedResult;
     }
 }
