@@ -5,48 +5,70 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build-and-release:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/wrapper-validation@v4
       - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.gradle/loom-cache
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-      - uses: gradle/actions/wrapper-validation@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'microsoft'
-      - run: chmod +x ./gradlew
-      - run: ./gradlew build --no-daemon --parallel
 
-      - id: version
-        run: |
-          DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          COUNT=$(gh api "repos/${{ github.repository }}/releases" --paginate \
-                  -q "[.[] | select(.tag_name | startswith(\"AutoTheme+Build.${DATE}\"))] | length")
-          NEXT=$((COUNT + 1))
-          VERSION="Build.${DATE}.${NEXT}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon --parallel --build-cache --configure-on-demand
+
+      - name: Compute next build number
+        id: version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+          PREFIX="AutoTheme+Build.${DATE}"
 
-      - run: |
+          MAX=$(gh api repos/${{ github.repository }}/releases \
+                --paginate -q ".[].tag_name" \
+                | grep -E "^${PREFIX}\.[0-9]+$" \
+                | sed "s/^${PREFIX}\.//" \
+                | sort -nr \
+                | head -n1 || echo "0")
+
+          NEXT=$((MAX + 1))
+          VERSION="${PREFIX}.${NEXT}"
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Next version => $VERSION"
+
+      - name: Pack artifacts
+        run: |
           cd build/libs
-          zip -9 -r "../../AutoTheme+${{ env.VERSION }}.zip" *
+          zip -9 -r "../../AutoTheme+${VERSION}.zip" *
 
-      - run: git archive --format=zip --output="AutoTheme+${{ env.VERSION }}-Source.zip" HEAD
+      - name: Pack source
+        run: |
+          git archive --format=zip \
+            --output="AutoTheme+${VERSION}-Source.zip" HEAD
 
-      - uses: softprops/action-gh-release@v2
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: AutoTheme+${{ env.VERSION }}
           name: AutoTheme+${{ env.VERSION }}
@@ -57,7 +79,8 @@ jobs:
           draft: false
           prerelease: false
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: AutoTheme+${{ env.VERSION }}
           path: |
