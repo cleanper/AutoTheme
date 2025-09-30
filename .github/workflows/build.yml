@@ -2,9 +2,9 @@ name: build-release
 
 on:
   push:
-    branches: [1.15-1.16.5]
+    branches: [1.14-1.14.4]
   pull_request:
-    branches: [1.15-1.16.5]
+    branches: [1.14-1.14.4]
   workflow_dispatch:
 
 permissions:

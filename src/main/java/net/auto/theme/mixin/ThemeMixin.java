@@ -12,20 +12,20 @@ public class ThemeMixin {
 
     @Inject(
             method = "<init>",
-            at = @At(
-                    value = "FIELD",
-                    target = "Lnet/minecraft/client/MinecraftClient;window:Lnet/minecraft/client/util/Window;",
-                    shift = At.Shift.AFTER
-            )
+            at = @At("RETURN")
     )
-    private void onWindowFieldSet(CallbackInfo ci) {
+    private void onConstructorReturn(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
-        WindowOps.apply(client.getWindow());
+        if (client.window != null) {
+            WindowOps.apply(client.window);
+        }
     }
 
     @Inject(method = "render", at = @At("HEAD"))
     private void onEveryFrame(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
-        WindowOps.applyIfNeeded(client.getWindow());
+        if (client.window != null) {
+            WindowOps.applyIfNeeded(client.window);
+        }
     }
 }
