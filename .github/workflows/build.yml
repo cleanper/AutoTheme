@@ -46,35 +46,39 @@ jobs:
           MAX=$(gh api repos/${{ github.repository }}/releases \
                 --paginate -q ".[].tag_name" \
                 | grep -E "^AutoTheme\\+${PREFIX}\\.[0-9]+$" \
+                | grep -v "AutoTheme+AutoTheme+" \
                 | sed "s/^AutoTheme\\+${PREFIX}\\.//" \
                 | sort -nr \
                 | head -n1 || echo "0")
 
           NEXT=$((MAX + 1))
           VERSION="${PREFIX}.${NEXT}"
+          FULL_VERSION="AutoTheme+${VERSION}"
 
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "✅ Next version => AutoTheme+$VERSION"
+          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Next version => $FULL_VERSION"
 
       - name: Pack artifacts
         run: |
           cd build/libs
-          zip -9 -r "../../AutoTheme+${VERSION}.zip" *
+          zip -9 -r "../../${{ env.FULL_VERSION }}.zip" *
 
       - name: Pack source
         run: |
           git archive --format=zip \
-            --output="AutoTheme+${VERSION}-Source.zip" HEAD
+            --output="${{ env.FULL_VERSION }}-Source.zip" HEAD
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: AutoTheme+${{ env.VERSION }}
-          name: AutoTheme+${{ env.VERSION }}
+          tag_name: ${{ env.FULL_VERSION }}
+          name: ${{ env.FULL_VERSION }}
           files: |
-            AutoTheme+${{ env.VERSION }}.zip
-            AutoTheme+${{ env.VERSION }}-Source.zip
+            ${{ env.FULL_VERSION }}.zip
+            ${{ env.FULL_VERSION }}-Source.zip
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -82,8 +86,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AutoTheme+${{ env.VERSION }}
+          name: ${{ env.FULL_VERSION }}
           path: |
-            AutoTheme+${{ env.VERSION }}.zip
-            AutoTheme+${{ env.VERSION }}-Source.zip
+            ${{ env.FULL_VERSION }}.zip
+            ${{ env.FULL_VERSION }}-Source.zip
           retention-days: 0
