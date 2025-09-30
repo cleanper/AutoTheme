@@ -1,7 +1,6 @@
 {
   "required": true,
   "package": "net.auto.theme.mixin",
-  "refmap": "autotheme.mixins.refmap.json",
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ThemeMixin"
