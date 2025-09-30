@@ -27,19 +27,25 @@ jobs:
           distribution: 'microsoft'
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon --parallel
+
       - id: version
         run: |
-          DATE=$(date +%Y%m%d)
-          COUNT=$(gh api "repos/${{ github.repository }}/actions/runs?created=$(date +%Y-%m-%d)&status=success" --paginate -q '[.workflow_runs[]|select(.name=="build-release")]|length')
-          VERSION="Build.${DATE}.${COUNT}"
+          DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+          COUNT=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+                  -q "[.[] | select(.tag_name | startswith(\"AutoTheme+Build.${DATE}\"))] | length")
+          NEXT=$((COUNT + 1))
+          VERSION="Build.${DATE}.${NEXT}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: |
           cd build/libs
           zip -9 -r "../../AutoTheme+${{ env.VERSION }}.zip" *
+
       - run: git archive --format=zip --output="AutoTheme+${{ env.VERSION }}-Source.zip" HEAD
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: AutoTheme+${{ env.VERSION }}
@@ -50,6 +56,7 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
       - uses: actions/upload-artifact@v4
         with:
           name: AutoTheme+${{ env.VERSION }}
