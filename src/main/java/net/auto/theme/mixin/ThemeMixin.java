@@ -13,12 +13,12 @@ public class ThemeMixin {
     @Inject(
             method = "<init>",
             at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/util/Window;setFramerateLimit(I)V",
+                    value = "FIELD",
+                    target = "Lnet/minecraft/client/MinecraftClient;window:Lnet/minecraft/client/util/Window;",
                     shift = At.Shift.AFTER
             )
     )
-    private void onWindowCreated(CallbackInfo ci) {
+    private void onWindowFieldSet(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
         WindowOps.apply(client.getWindow());
     }

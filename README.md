@@ -25,7 +25,7 @@
 
 ## 本模组需要的依赖？
 
-- Minecraft 1.20-1.21.1
+- Minecraft [More...] 1.20-1.21.9 [可直接最新版本]
 + Java21+
 - Fabric Loader[**最新版本**]
 
