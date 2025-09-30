@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "io.github.a5b84.darkloadingscreen.mixin",
+	"plugin": "io.github.a5b84.darkloadingscreen.mixin.MixinPlugin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"GlCommandEncoderMixin",
+		"SplashOverlayMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
