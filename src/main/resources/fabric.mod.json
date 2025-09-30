@@ -3,21 +3,22 @@
 	"id": "autotheme",
 	"version": "1.0.0",
 	"name": "AutoTheme",
-	"description": "自适应系统主题",
+	"description": "自适应系统主题[内置了ForceJava21-Reborn模组的功能]",
 	"authors": ["YL"],
 	"license": "LGPL-3.0",
 	"icon": "Logo.png",
-	"environment": "client",
+	"environment": "*",
 	"entrypoints": {
-		"client": ["net.auto.theme.AutoThemeLoader"]
+      "client": ["net.auto.theme.AutoThemeLoader"],
+      "main": ["net.auto.theme.java21.FJ21R"]
 	},
 	"mixins": [
 		"autotheme.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.17.2",
-		"minecraft": ">=1.17 <=1.21.9",
-		"java": ">=21"
+		"minecraft": ">=1.15 <=1.16.5",
+		"java": ">=8"
 	},
 	"suggests": {
 		"another-mod": "*"
