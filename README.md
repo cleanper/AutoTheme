@@ -27,7 +27,7 @@
 
 - Minecraft 1.21-1.21.1
 + Java21+
-- Fabric最新
+- Fabric Loader[**最新版本**]
 
 ---
 
