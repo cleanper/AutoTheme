@@ -1,9 +1,11 @@
 package io.github.a5b84.darkloadingscreen;
 
 public final class AutoTheme {
+    private static final String ARCH = System.getProperty("os.arch").toLowerCase();
+    private static final boolean IS_64_BIT = ARCH.contains("64");
+
     static {
-        String arch = System.getProperty("os.arch");
-        String dllName = arch.contains("64") ? "AutoTheme_x64" : "AutoTheme_x86";
+        String dllName = IS_64_BIT ? "AutoTheme_x64" : "AutoTheme_x86";
         try {
             System.loadLibrary(dllName);
         } catch (UnsatisfiedLinkError e) {
@@ -32,9 +34,5 @@ public final class AutoTheme {
         } else {
             System.out.println("[DarkLoadingScreen] Mod ENABLED - System is in dark mode");
         }
-    }
-
-    public static boolean isEnabled() {
-        return IS_ENABLED;
     }
 }

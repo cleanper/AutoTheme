@@ -33,6 +33,7 @@
 	},
 	"license": "LGPL-3.0-or-later",
 	"icon": "assets/dark-loading-screen/icon.png",
+  "accessWidener": "dark-loading-screen.accesswidener",
 	"environment": "client",
 	"entrypoints": {
 		"client": [

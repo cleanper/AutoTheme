@@ -16,13 +16,8 @@ public class DarkLoadingScreen {
     public static final LoadingScreenConfig CONFIG;
 
     static {
-        if (AutoTheme.isEnabled()) {
-            MOJANG_LOGO_SHADOWS = RenderPipelines.register(
-                    RenderPipeline.builder(RenderPipelines.POSITION_TEX_COLOR_SNIPPET)
-                            .withLocation(Identifier.of(MOD_ID, "pipeline/mojang_logo_shadows"))
-                            .withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE))
-                            .build()
-            );
+        if (AutoTheme.IS_ENABLED) {
+            MOJANG_LOGO_SHADOWS = createShadowPipeline();
             CONFIG = new LoadingScreenConfig();
             System.out.println("[DarkLoadingScreen] Config initialized for DARK theme");
         } else {
@@ -30,5 +25,14 @@ public class DarkLoadingScreen {
             CONFIG = null;
             System.out.println("[DarkLoadingScreen] Config NOT initialized - mod disabled for light mode");
         }
+    }
+
+    private static RenderPipeline createShadowPipeline() {
+        return RenderPipelines.register(
+                RenderPipeline.builder(RenderPipelines.POSITION_TEX_COLOR_SNIPPET)
+                        .withLocation(Identifier.of(MOD_ID, "pipeline/mojang_logo_shadows"))
+                        .withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE))
+                        .build()
+        );
     }
 }
