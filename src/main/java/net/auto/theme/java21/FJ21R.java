@@ -7,7 +7,6 @@ import javax.swing.JOptionPane;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -17,93 +16,125 @@ import java.util.logging.Logger;
 
 public class FJ21R implements ModInitializer {
     private static final Logger LOGGER = Logger.getLogger("ForceJava21 Reborn");
+    private static final String JAVA_VERSION = System.getProperty("java.specification.version");
+    private static final String JAVA_ARCH = System.getProperty("sun.arch.data.model");
+
+    private static final float PARSED_JAVA_VERSION = Float.parseFloat(JAVA_VERSION);
+    private static final int PARSED_JAVA_ARCH = Integer.parseInt(JAVA_ARCH);
+
+    private static final String CONFIG_FILENAME = "fj21r.properties";
+    private static final String DEFAULT_AMZ_LINK = "https://aws.amazon.com/corretto/";
+    private static final String DEFAULT_ZULU_LINK = "https://www.azul.com/downloads/?package=jdk#zulu";
+    private static final String DEFAULT_PRIME_LINK = "https://www.azul.com/downloads/?package=jdk#prime";
+    private static final String DEFAULT_TEMURIN_LINK = "https://adoptium.net/temurin/releases/?package=jdk";
 
     @Override
     public void onInitialize() {
-        Path configPath = FabricLoader.getInstance().getConfigDir();
-        Path configFilePath = configPath.resolve("fj21r.properties");
+        Path configFilePath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILENAME);
 
         if (!Files.exists(configFilePath)) {
             genConfigFile(configFilePath);
         }
 
-        Properties properties = new Properties();
-        try (InputStream inputStream = Files.newInputStream(configFilePath)) {
-            properties.load(inputStream);
-        } catch (IOException ioe) {
-            LOGGER.severe("Failed to load config file: " + ioe.getLocalizedMessage());
+        Properties properties = loadProperties(configFilePath);
+        if (properties == null) {
+            return;
         }
 
         if (!isAllowedJavaVersionAndArch(properties)) {
-            String crashInfo = genCrashInfo(properties);
+            handleInvalidJavaEnvironment(properties);
+        } else {
+            LOGGER.info("Java version and arch check passed!");
+        }
+    }
 
-            Object[] options = {"OK", "Copy and close"};
-            int choice = JOptionPane.showOptionDialog(null, crashInfo, "WRONG JAVA VERSION OR ARCH!",
-                    JOptionPane.YES_NO_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options);
+    private Properties loadProperties(Path configFilePath) {
+        Properties properties = new Properties();
+        try (InputStream inputStream = Files.newInputStream(configFilePath)) {
+            properties.load(inputStream);
+            return properties;
+        } catch (IOException ioe) {
+            LOGGER.severe("Failed to load config file: " + ioe.getLocalizedMessage());
+            return null;
+        }
+    }
 
-            if (choice == JOptionPane.NO_OPTION) {
-                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(crashInfo), null);
-            }
+    private void handleInvalidJavaEnvironment(Properties properties) {
+        String crashInfo = genCrashInfo(properties);
 
-            throw new RuntimeException("\n" + crashInfo);
+        Object[] options = {"OK", "Copy and close"};
+        int choice = JOptionPane.showOptionDialog(null, crashInfo, "WRONG JAVA VERSION OR ARCH!",
+                JOptionPane.YES_NO_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options);
+
+        if (choice == JOptionPane.NO_OPTION) {
+            copyToClipboard(crashInfo);
         }
 
-        LOGGER.info("Java version and arch check passed!");
+        throw new RuntimeException("\n" + crashInfo);
+    }
+
+    private void copyToClipboard(String text) {
+        try {
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+        } catch (Exception e) {
+            LOGGER.warning("Failed to copy to clipboard: " + e.getMessage());
+        }
     }
 
     private String genCrashInfo(Properties properties) {
         String needsJavaVersion = properties.getProperty("java_version", "");
         String needsJavaArch = properties.getProperty("java_arch", "");
+        boolean strictCheck = Boolean.parseBoolean(properties.getProperty("enable_strict_check", "true"));
 
-        return String.format("Please use Java%s%s x%s to launch Minecraft!\n\nCurrent Java version: %s x%s\n\nRecommendations:\n- Amazon Corretto: %s\n- Azul Zulu: %s\n- Azul Platform Prime(Linux only): %s\n- Adoptium Eclipse Temurin: %s",
-                isEmpty(needsJavaVersion) ? " [Any version]" : needsJavaVersion,
-                Boolean.parseBoolean(properties.getProperty("enable_strict_check", "true")) ? "" : "(or later)",
-                isEmpty(needsJavaArch) ? "[Any architecture]" : needsJavaArch,
-                System.getProperty("java.specification.version"),
-                System.getProperty("sun.arch.data.model"),
-                properties.getProperty("amz_link", "https://aws.amazon.com/corretto/"),
-                properties.getProperty("zulu_link", "https://www.azul.com/downloads/?package=jdk#zulu"),
-                properties.getProperty("platform_prime_link", "https://www.azul.com/downloads/?package=jdk#prime"),
-                properties.getProperty("temurin_link", "https://adoptium.net/temurin/releases/?package=jdk"));
+        String versionQualifier = isEmpty(needsJavaVersion) ? " [Any version]" : needsJavaVersion;
+        String archQualifier = isEmpty(needsJavaArch) ? "[Any architecture]" : needsJavaArch;
+        String strictQualifier = strictCheck ? "" : "(or later)";
+
+        return String.format(
+                "Please use Java%s%s x%s to launch Minecraft!%n%nCurrent Java version: %s x%s%n%nRecommendations:%n- Amazon Corretto: %s%n- Azul Zulu: %s%n- Azul Platform Prime(Linux only): %s%n- Adoptium Eclipse Temurin: %s",
+                versionQualifier, strictQualifier, archQualifier,
+                JAVA_VERSION, JAVA_ARCH,
+                properties.getProperty("amz_link", DEFAULT_AMZ_LINK),
+                properties.getProperty("zulu_link", DEFAULT_ZULU_LINK),
+                properties.getProperty("platform_prime_link", DEFAULT_PRIME_LINK),
+                properties.getProperty("temurin_link", DEFAULT_TEMURIN_LINK)
+        );
     }
 
     private void genConfigFile(Path configFilePath) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(configFilePath.toFile()))) {
+        try (BufferedWriter writer = Files.newBufferedWriter(configFilePath)) {
             writer.write("java_version=\n");
             writer.write("java_arch=\n");
-            writer.write("amz_link=https://aws.amazon.com/corretto/\n");
-            writer.write("zulu_link=https://www.azul.com/downloads/?package=jdk#zulu\n");
-            writer.write("platform_prime_link=https://www.azul.com/downloads/?package=jdk#prime\n");
-            writer.write("temurin_link=https://adoptium.net/temurin/releases/?package=jdk\n");
+            writer.write("amz_link=" + DEFAULT_AMZ_LINK + "\n");
+            writer.write("zulu_link=" + DEFAULT_ZULU_LINK + "\n");
+            writer.write("platform_prime_link=" + DEFAULT_PRIME_LINK + "\n");
+            writer.write("temurin_link=" + DEFAULT_TEMURIN_LINK + "\n");
             writer.write("enable_strict_check=true");
 
-            LOGGER.info("Created config file at " + configFilePath);
+            LOGGER.info(() -> "Created config file at " + configFilePath); // 使用lambda延迟日志计算
         } catch (IOException ioe) {
             LOGGER.severe("Failed to create config file: " + ioe.getLocalizedMessage());
         }
     }
 
     private boolean isAllowedJavaVersionAndArch(Properties properties) {
-        float javaVersion = Float.parseFloat(System.getProperty("java.specification.version"));
-        int javaArch = Integer.parseInt(System.getProperty("sun.arch.data.model"));
         String needsJavaVersion = properties.getProperty("java_version", "");
         String needsJavaArch = properties.getProperty("java_arch", "");
         boolean strictCheck = Boolean.parseBoolean(properties.getProperty("enable_strict_check", "true"));
 
-        return isVersionValid(needsJavaVersion, javaVersion, strictCheck) &&
-                isArchValid(needsJavaArch, javaArch, strictCheck);
+        return isVersionValid(needsJavaVersion, strictCheck) && isArchValid(needsJavaArch, strictCheck);
     }
 
-    private boolean isVersionValid(String needsJavaVersion, float javaVersion, boolean strictCheck) {
+    private boolean isVersionValid(String needsJavaVersion, boolean strictCheck) {
         if (isEmpty(needsJavaVersion)) return true;
         float neededVersion = Float.parseFloat(needsJavaVersion);
-        return strictCheck ? javaVersion == neededVersion : javaVersion >= neededVersion;
+        return strictCheck ? PARSED_JAVA_VERSION == neededVersion : PARSED_JAVA_VERSION >= neededVersion;
     }
 
-    private boolean isArchValid(String needsJavaArch, int javaArch, boolean strictCheck) {
+    private boolean isArchValid(String needsJavaArch, boolean strictCheck) {
         if (isEmpty(needsJavaArch)) return true;
         int neededArch = Integer.parseInt(needsJavaArch);
-        return strictCheck ? javaArch == neededArch : javaArch >= neededArch;
+        return strictCheck ? PARSED_JAVA_ARCH == neededArch : PARSED_JAVA_ARCH >= neededArch;
     }
 
     private boolean isEmpty(String str) {

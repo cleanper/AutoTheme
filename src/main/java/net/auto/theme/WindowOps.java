@@ -2,12 +2,13 @@ package net.auto.theme;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
 import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
 
-@SuppressWarnings("ResultOfMethodCallIgnored") // 忽略getPointer结果
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public final class WindowOps {
     private static boolean lastDark = !AutoTheme.dark(); // 强制第一次刷新
     private static long lastHandle = 0;
@@ -20,6 +21,7 @@ public final class WindowOps {
     private static final int S_OK = 0x00000000;
 
     static {
+        // 预初始化指针
         TRUE_REF.getPointer();
         FALSE_REF.getPointer();
     }
@@ -33,7 +35,13 @@ public final class WindowOps {
         applyTheme(w, false);
     }
 
-    @SuppressWarnings("StatementWithEmptyBody")
+    private static long getWindowHandle(Window w) {
+        if (lastHandle == 0) {
+            lastHandle = GLFWNativeWin32.glfwGetWin32Window(w.getHandle());
+        }
+        return lastHandle;
+    }
+
     private static void applyTheme(Window w, boolean force) {
         boolean dark = AutoTheme.dark();
 
@@ -42,19 +50,16 @@ public final class WindowOps {
         }
         lastDark = dark;
 
-        long hwnd = GLFWNativeWin32.glfwGetWin32Window(w.getHandle());
-
-        if (hwnd != lastHandle) {
-            lastHandle = hwnd;
-        }
-
+        long handle = getWindowHandle(w);
         IntByReference ref = dark ? TRUE_REF : FALSE_REF;
+
         int result = DwmApi.INSTANCE.DwmSetWindowAttribute(
-                new Pointer(hwnd),
+                new WinDef.HWND(Pointer.createConstant(handle)).getPointer(),
                 ATTRIBUTE,
                 ref.getPointer(),
                 SIZE);
 
+        //noinspection StatementWithEmptyBody
         if (result != S_OK) {
             // System.err.println("设置窗口主题失败，错误代码: 0x" + Integer.toHexString(result));
         } else {
