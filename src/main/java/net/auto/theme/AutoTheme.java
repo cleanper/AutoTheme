@@ -13,11 +13,11 @@ final class AutoTheme {
     private static volatile boolean cachedResult = false;
     private static final long CHECK_INTERVAL = 100; // 0.1秒检测间隔
 
-    // @SuppressWarnings("StatementWithEmptyBody")
     static boolean dark() {
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastCheckTime > CHECK_INTERVAL) {
             synchronized (AutoTheme.class) {
+                //noinspection RedundantSuppression
                 if (currentTime - lastCheckTime > CHECK_INTERVAL) //noinspection CommentedOutCode
                 {
                     cachedResult = dark0();
