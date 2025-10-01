@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version "1.12.0-alpha.22" // 1.11-SNAPSHOT
+	id 'fabric-loom' version "1.12.0-alpha.23" // 1.11-SNAPSHOT
 }
 
 repositories {}
