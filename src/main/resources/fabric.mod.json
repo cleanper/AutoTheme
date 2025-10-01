@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "autotheme",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"name": "AutoTheme",
 	"description": "自适应系统主题",
 	"authors": ["YL"],
@@ -18,8 +18,5 @@
 		"fabricloader": ">=0.17.2",
 		"minecraft": ">=1.17 <=1.21.9",
 		"java": ">=21"
-	},
-	"suggests": {
-		"another-mod": "*"
 	}
 }
