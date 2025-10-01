@@ -29,6 +29,7 @@ public final class WindowOps {
         applyTheme(w, true);
     }
 
+    // 只在主题变化时应用
     public static void applyIfNeeded(Window w) {
         applyTheme(w, false);
     }
