@@ -18,12 +18,6 @@ public class ThemeMixin {
     @Unique
     private boolean themeInitialized = false;
 
-    @Unique
-    private long lastFrameCheck = 0;
-
-    @Unique
-    private static final long FRAME_CHECK_INTERVAL = 100;
-
     @Inject(
             method = "<init>",
             at = @At(
@@ -48,11 +42,7 @@ public class ThemeMixin {
 
     @Inject(method = "render", at = @At("HEAD"))
     private void onEveryFrame(CallbackInfo ci) {
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastFrameCheck > FRAME_CHECK_INTERVAL) {
-            MinecraftClient client = (MinecraftClient) (Object) this;
-            WindowOps.applyIfNeeded(client.getWindow());
-            lastFrameCheck = currentTime;
-        }
+        MinecraftClient client = (MinecraftClient) (Object) this;
+        WindowOps.applyIfNeeded(client.getWindow());
     }
 }

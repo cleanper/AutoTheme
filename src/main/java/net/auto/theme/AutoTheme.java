@@ -22,13 +22,13 @@ public final class AutoTheme {
     public static native void StopMonitor(); // 停止主题监控
 
     private static final long CHECK_INTERVAL = 100; // 全局缓存检查间隔 0.1秒
-    private static final long THREAD_CACHE_INTERVAL = 16; // 线程级缓存间隔
+    private static final long THREAD_CACHE_INTERVAL = 16;
 
     private static final ThreadLocal<ThemeCache> threadLocalCache =
             ThreadLocal.withInitial(ThemeCache::new);
 
-    private static long lastGlobalCheck = 0;
-    private static boolean globalCachedResult = false;
+    private static volatile long lastGlobalCheck = 0;
+    private static volatile boolean globalCachedResult = false;
     private static final Object GLOBAL_LOCK = new Object();
     private static volatile boolean monitorStarted = false;
 
@@ -45,14 +45,9 @@ public final class AutoTheme {
             return threadCache.threadCachedResult;
         }
 
-        long lastGlobal;
-        boolean globalResult;
-        synchronized (GLOBAL_LOCK) {
-            lastGlobal = lastGlobalCheck;
-            globalResult = globalCachedResult;
-        }
-
+        long lastGlobal = lastGlobalCheck;
         if (currentTime - lastGlobal <= CHECK_INTERVAL) {
+            boolean globalResult = globalCachedResult;
             threadCache.threadCachedResult = globalResult;
             threadCache.lastThreadCheck = currentTime;
             return globalResult;
@@ -78,9 +73,7 @@ public final class AutoTheme {
     }
 
     static void notifyThemeChanged() {
-        synchronized (GLOBAL_LOCK) {
-            lastGlobalCheck = 0;
-        }
+        lastGlobalCheck = 0;
         threadLocalCache.remove();
         WindowOps.onThemeChanged();
     }

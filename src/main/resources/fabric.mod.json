@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "autotheme",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"name": "AutoTheme",
 	"description": "自适应系统主题",
 	"authors": ["YL"],
