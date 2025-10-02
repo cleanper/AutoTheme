@@ -1,4 +1,4 @@
-name: build-release-optimized
+name: build-release
 
 on:
   push:
@@ -63,6 +63,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: build-output
