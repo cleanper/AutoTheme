@@ -1,5 +1,6 @@
 package net.auto.theme.mixin;
 
+import net.auto.theme.AutoTheme;
 import net.auto.theme.WindowOps;
 import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +15,9 @@ public class ThemeMixin {
     @Unique
     private boolean themeApplied = false;
 
+    @Unique
+    private boolean themeInitialized = false;
+
     @Inject(
             method = "<init>",
             at = @At(
@@ -25,6 +29,12 @@ public class ThemeMixin {
     private void onWindowFieldSet(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
         if (!themeApplied) {
+            if (!themeInitialized) {
+                WindowOps.initializeJNI();
+                AutoTheme.initialize();
+                themeInitialized = true;
+            }
+
             WindowOps.apply(client.getWindow());
             themeApplied = true;
         }

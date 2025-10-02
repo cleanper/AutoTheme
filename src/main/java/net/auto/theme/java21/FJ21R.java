@@ -111,7 +111,7 @@ public class FJ21R implements ModInitializer {
             writer.write("temurin_link=" + DEFAULT_TEMURIN_LINK + "\n");
             writer.write("enable_strict_check=true");
 
-            LOGGER.info(() -> "Created config file at " + configFilePath); // 使用lambda延迟日志计算
+            LOGGER.info(() -> "Created config file at " + configFilePath);
         } catch (IOException ioe) {
             LOGGER.severe("Failed to create config file: " + ioe.getLocalizedMessage());
         }
