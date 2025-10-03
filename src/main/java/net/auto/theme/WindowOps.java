@@ -10,6 +10,7 @@ import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.StampedLock;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public final class WindowOps {
@@ -17,6 +18,7 @@ public final class WindowOps {
     private static long lastHandle = 0;
 
     private static final AtomicBoolean themeChangeDetected = new AtomicBoolean(true); // 初始为true以便首次应用
+    private static final StampedLock windowLock = new StampedLock();
 
     private static final IntByReference TRUE_REF = new IntByReference(1);
     private static final IntByReference FALSE_REF = new IntByReference(0);
@@ -72,15 +74,35 @@ public final class WindowOps {
         if (!jniInitialized) {
             AutoTheme.GetCurrentTheme(); // 预热 JNI 调用
             jniInitialized = true;
-            lastDark = !AutoTheme.dark();
+            long stamp = windowLock.writeLock();
+            try {
+                lastDark = !AutoTheme.dark();
+            } finally {
+                windowLock.unlockWrite(stamp);
+            }
         }
     }
 
     private static long getWindowHandle(Window w) {
+        long stamp = windowLock.tryOptimisticRead();
         long handle = lastHandle;
+        if (!windowLock.validate(stamp)) {
+            stamp = windowLock.readLock();
+            try {
+                handle = lastHandle;
+            } finally {
+                windowLock.unlockRead(stamp);
+            }
+        }
+
         if (handle == 0) {
             handle = GLFWNativeWin32.glfwGetWin32Window(w.getHandle());
-            lastHandle = handle;
+            stamp = windowLock.writeLock();
+            try {
+                lastHandle = handle;
+            } finally {
+                windowLock.unlockWrite(stamp);
+            }
         }
         return handle;
     }
@@ -88,13 +110,32 @@ public final class WindowOps {
     private static void applyTheme(Window w) {
         boolean dark = AutoTheme.dark();
 
-        // 如果主题未变化则|跳过
-        if (dark == lastDark) {
-            return;
+        long stamp = windowLock.tryOptimisticRead();
+        boolean currentLastDark = lastDark;
+        if (windowLock.validate(stamp) && dark == currentLastDark) {
+            return; // 主题未变化则跳过
+        }
+
+        stamp = windowLock.readLock();
+        try {
+            if (dark == lastDark) {
+                return;
+            }
+        } finally {
+            windowLock.unlockRead(stamp);
         }
 
         // 主题发生变化时应用|新主题
-        lastDark = dark;
+        stamp = windowLock.writeLock();
+        try {
+            if (dark == lastDark) {
+                return;
+            }
+            lastDark = dark;
+        } finally {
+            windowLock.unlockWrite(stamp);
+        }
+
         long handle = getWindowHandle(w);
         if (handle != 0) {
             applyThemeToWindow(handle, dark);
