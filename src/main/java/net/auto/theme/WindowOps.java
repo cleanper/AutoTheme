@@ -17,39 +17,29 @@ public final class WindowOps {
     private static long lastHandle = 0;
 
     private static final AtomicBoolean themeChangeDetected = new AtomicBoolean(true); // 初始为true以便首次应用
-    private static final AtomicBoolean initializationComplete = new AtomicBoolean(false);
 
-    private static IntByReference TRUE_REF;
-    private static IntByReference FALSE_REF;
-    private static WinDef.DWORD ATTRIBUTE;
-    private static WinDef.DWORD SIZE;
-    private static DwmApi DWMApiInstance;
+    private static final IntByReference TRUE_REF = new IntByReference(1);
+    private static final IntByReference FALSE_REF = new IntByReference(0);
+    private static final WinDef.DWORD ATTRIBUTE = new WinDef.DWORD(20L); // DWMWA_USE_IMMERSIVE_DARK_MODE
+    private static final WinDef.DWORD SIZE = new WinDef.DWORD(4L);
+
+    private static final DwmApi DWMApiInstance =
+            Native.load("dwmapi", DwmApi.class, W32APIOptions.DEFAULT_OPTIONS);
 
     private static volatile boolean jniInitialized = false;
 
     static {
-        new Thread(() -> Native.load("dwmapi", DwmApi.class, W32APIOptions.DEFAULT_OPTIONS), "AutoTheme-Preload").start();
-    }
+        // 预初始化指针
+        TRUE_REF.getPointer();
+        FALSE_REF.getPointer();
 
-    private static void ensureInitialized() {
-        if (initializationComplete.get()) return;
-
-        synchronized (WindowOps.class) {
-            if (initializationComplete.get()) return;
-
-            TRUE_REF = new IntByReference(1);
-            FALSE_REF = new IntByReference(0);
-            ATTRIBUTE = new WinDef.DWORD(20L); // DWMWA_USE_IMMERSIVE_DARK_MODE
-            SIZE = new WinDef.DWORD(4L);
-
-            DWMApiInstance = Native.load("dwmapi", DwmApi.class, W32APIOptions.DEFAULT_OPTIONS);
-
-            // 预初始化指针
-            TRUE_REF.getPointer();
-            FALSE_REF.getPointer();
-
-            initializationComplete.set(true);
-        }
+        new Thread(() -> {
+            try {
+                DWMApiInstance.toString();
+            } catch (Exception e) {
+                // 静默处理
+            }
+        }, "AutoTheme-Preload").start();
     }
 
     /**
@@ -57,8 +47,7 @@ public final class WindowOps {
      * @param w Minecraft窗口实例
      */
     public static void apply(Window w) {
-        ensureInitialized();
-        if (jniInitialized && initializationComplete.get()) {
+        if (jniInitialized) {
             applyTheme(w);
         }
     }
@@ -67,7 +56,7 @@ public final class WindowOps {
      * 仅在检测到主题变化时|应用主题
      */
     public static void applyIfNeeded(Window w) {
-        if (!jniInitialized || !initializationComplete.get()) return;
+        if (!jniInitialized) return;
 
         if (themeChangeDetected.getAndSet(false)) {
             applyTheme(w);
@@ -81,7 +70,7 @@ public final class WindowOps {
 
     public static void initializeJNI() {
         if (!jniInitialized) {
-            AutoTheme.GetCurrentTheme();
+            AutoTheme.GetCurrentTheme(); // 预热 JNI 调用
             jniInitialized = true;
             lastDark = !AutoTheme.dark();
         }
@@ -97,11 +86,6 @@ public final class WindowOps {
     }
 
     private static void applyTheme(Window w) {
-        if (!initializationComplete.get()) {
-            ensureInitialized();
-            if (!initializationComplete.get()) return; // 如果初始化仍未完成则|跳过
-        }
-
         boolean dark = AutoTheme.dark();
 
         // 如果主题未变化则|跳过
@@ -129,6 +113,12 @@ public final class WindowOps {
     }
 
     private interface DwmApi extends StdCallLibrary {
-        void DwmSetWindowAttribute(WinDef.HWND hwnd, WinDef.DWORD attr, Pointer data, WinDef.DWORD size);
+        @SuppressWarnings("UnusedReturnValue")
+        int DwmSetWindowAttribute(
+                WinDef.HWND hwnd,
+                WinDef.DWORD dwAttribute,
+                Pointer pvAttribute,
+                WinDef.DWORD cbAttribute
+        );
     }
 }

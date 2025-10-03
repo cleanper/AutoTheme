@@ -1,7 +1,12 @@
 package net.auto.theme;
 
+import java.util.concurrent.Flow;
+import java.util.concurrent.SubmissionPublisher;
+import java.util.concurrent.atomic.AtomicReference;
+
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
+    private static final SubmissionPublisher<Boolean> themePublisher = new SubmissionPublisher<>();
 
     static {
         loadLibrary();
@@ -9,11 +14,24 @@ public final class AutoTheme {
 
     private static void loadLibrary() {
         if (!libraryLoaded) {
-            String arch = System.getProperty("os.arch").toLowerCase();
-            String dllName = arch.contains("64") ? "AutoTheme_x64" : "AutoTheme_x86";
-            System.loadLibrary(dllName); // 根据架构加载对应的 DLL
+            String dllName = getPlatformDllName();
+            System.loadLibrary(dllName);
             libraryLoaded = true;
         }
+    }
+
+    private static String getPlatformDllName() {
+        String arch = System.getProperty("os.arch").toLowerCase();
+        String os = System.getProperty("os.name").toLowerCase();
+
+        if (os.contains("windows")) {
+            if (arch.contains("64") || arch.equals("amd64") || arch.equals("x86_64")) {
+                return "AutoTheme_x64"; // 若系统为64位架构加载X64的库
+            } else if (arch.contains("86")) {
+                return "AutoTheme_x86"; // 若系统为32位架构加载X86的库
+            }
+        }
+        throw new UnsupportedOperationException("Unsupported platform: " + os + "/" + arch); // 若为其他架构则抛出不兼容提示
     }
 
     public static native int GetCurrentTheme(); // 获取当前主题状态 (0=浅色, 1=深色)
@@ -21,62 +39,48 @@ public final class AutoTheme {
     public static native void StartMonitor(); // 启动主题监控
     public static native void StopMonitor(); // 停止主题监控
 
-    private static final long CHECK_INTERVAL = 100; // 全局缓存检查间隔 0.1秒
-    private static final long THREAD_CACHE_INTERVAL = 16;
-
-    private static final ThreadLocal<ThemeCache> threadLocalCache =
-            ThreadLocal.withInitial(ThemeCache::new);
-
-    private static volatile long lastGlobalCheck = 0;
-    private static volatile boolean globalCachedResult = false;
-    private static final Object GLOBAL_LOCK = new Object();
-    private static volatile boolean monitorStarted = false;
-
-    private static class ThemeCache {
-        long lastThreadCheck = 0;
-        boolean threadCachedResult = false;
+    @SuppressWarnings("unused")
+    public static Flow.Publisher<Boolean> themeChanges() {
+        return themePublisher;
     }
+
+    private static final AtomicReference<ThemeState> currentThemeState =
+            new AtomicReference<>(new ThemeState(false, 0, 0));
+    private static final long CACHE_TIMEOUT = 100; // 缓存超时时间(0.1秒)
+
+    private record ThemeState(boolean isDark, long timestamp, int version) {}
 
     public static boolean dark() {
-        ThemeCache threadCache = threadLocalCache.get();
         long currentTime = System.currentTimeMillis();
+        ThemeState state = currentThemeState.get();
 
-        if (currentTime - threadCache.lastThreadCheck <= THREAD_CACHE_INTERVAL) {
-            return threadCache.threadCachedResult;
+        if (currentTime - state.timestamp <= CACHE_TIMEOUT) {
+            return state.isDark;
         }
 
-        long lastGlobal = lastGlobalCheck;
-        if (currentTime - lastGlobal <= CHECK_INTERVAL) {
-            boolean globalResult = globalCachedResult;
-            threadCache.threadCachedResult = globalResult;
-            threadCache.lastThreadCheck = currentTime;
-            return globalResult;
-        }
-
-        return updateThemeCache(currentTime, threadCache);
+        return updateThemeCache(currentTime);
     }
 
-    private static boolean updateThemeCache(long currentTime, ThemeCache threadCache) {
-        // 调用DLL获取当前主题状态
+    private static boolean updateThemeCache(long currentTime) {
         int result = GetCurrentTheme();
         boolean boolResult = (result == 1);
-
-        synchronized (GLOBAL_LOCK) {
-            globalCachedResult = boolResult;
-            lastGlobalCheck = currentTime;
-        }
-
-        threadCache.threadCachedResult = boolResult;
-        threadCache.lastThreadCheck = currentTime;
-
+        ThemeState newState = new ThemeState(boolResult, currentTime, 0);
+        currentThemeState.set(newState);
         return boolResult;
     }
 
     static void notifyThemeChanged() {
-        lastGlobalCheck = 0;
-        threadLocalCache.remove();
+        // 使缓存立即失效
+        currentThemeState.set(new ThemeState(false, 0, 0));
+
+        // 发布主题变化事件
+        boolean isDark = dark();
+        themePublisher.submit(isDark);
+
         WindowOps.onThemeChanged();
     }
+
+    private static volatile boolean monitorStarted = false;
 
     public static void startThemeMonitoring() {
         if (!monitorStarted) {
