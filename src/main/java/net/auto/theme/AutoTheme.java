@@ -2,11 +2,21 @@ package net.auto.theme;
 
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
-import java.util.concurrent.atomic.AtomicStampedReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
     private static final SubmissionPublisher<Boolean> themePublisher = new SubmissionPublisher<>();
+
+    private static final Thread.Builder virtualThreadBuilder = Thread.ofVirtual().name("AutoTheme-Virtual-", 0);
+
+    private static final AtomicInteger currentSystemTheme = new AtomicInteger(0);
+
+    private static volatile boolean appInitialized = false;
+
+    private static final AtomicBoolean monitorStarted = new AtomicBoolean(false);
+    private static final AtomicBoolean directCallbackInitialized = new AtomicBoolean(false);
 
     static {
         loadLibrary();
@@ -35,93 +45,73 @@ public final class AutoTheme {
     }
 
     public static native int GetCurrentTheme(); // 获取当前主题状态 (0=浅色, 1=深色)
-    public static native void SetThemeCallback(Runnable callback); // 设置主题变化回调
+
     public static native void StartMonitor(); // 启动主题监控
     public static native void StopMonitor(); // 停止主题监控
+
+    private static native void SetDirectThemeCallback();
 
     @SuppressWarnings("unused")
     public static Flow.Publisher<Boolean> themeChanges() {
         return themePublisher;
     }
 
-    private static final AtomicStampedReference<ThemeState> currentThemeState =
-            new AtomicStampedReference<>(new ThemeState(false, 0), 0);
-    private static final long CACHE_TIMEOUT = 100; // 缓存超时时间(0.1秒)
-
-    private record ThemeState(boolean isDark, long timestamp) {}
-
     public static boolean dark() {
-        int[] stampHolder = new int[1];
-        ThemeState state = currentThemeState.get(stampHolder);
-        long currentTime = System.currentTimeMillis();
+        return currentSystemTheme.get() == 1;
+    }
 
-        if (currentTime - state.timestamp() <= CACHE_TIMEOUT) {
-            return state.isDark();
+    @SuppressWarnings("unused")
+    private static void onSystemThemeChanged(int newTheme) {
+        int oldTheme = currentSystemTheme.getAndSet(newTheme);
+
+        if (oldTheme != newTheme) {
+            // 发布主题变化事件
+            virtualThreadBuilder.start(() -> {
+                boolean isDark = (newTheme == 1);
+                themePublisher.submit(isDark);
+                WindowOps.onThemeChanged(isDark);
+            });
+            // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色"));
         }
-
-        return updateThemeCache();
     }
-
-    private static boolean updateThemeCache() {
-        long currentTime = System.currentTimeMillis();
-        int result = GetCurrentTheme();
-        boolean boolResult = (result == 1);
-        ThemeState newState = new ThemeState(boolResult, currentTime);
-
-        int[] oldStamp = new int[1];
-        ThemeState oldState;
-        do {
-            oldState = currentThemeState.get(oldStamp);
-            if (oldState.isDark() == boolResult &&
-                    (currentTime - oldState.timestamp()) <= CACHE_TIMEOUT) {
-                return boolResult;
-            }
-        } while (!currentThemeState.compareAndSet(oldState, newState, oldStamp[0], oldStamp[0] + 1));
-
-        return boolResult;
-    }
-
-    static void notifyThemeChanged() {
-        int[] stampHolder = new int[1];
-        ThemeState current = currentThemeState.get(stampHolder);
-        ThemeState newState = new ThemeState(false, 0);
-        currentThemeState.compareAndSet(current, newState, stampHolder[0], stampHolder[0] + 1);
-
-        // 发布主题变化事件
-        boolean isDark = dark();
-        themePublisher.submit(isDark);
-
-        WindowOps.onThemeChanged();
-    }
-
-    private static volatile boolean monitorStarted = false;
 
     public static void startThemeMonitoring() {
-        if (!monitorStarted) {
-            // System.out.println("AutoTheme: 收到系统主题变化通知");
-            SetThemeCallback(AutoTheme::notifyThemeChanged);
-            new Thread(() -> {
+        if (monitorStarted.compareAndSet(false, true)) {
+            currentSystemTheme.set(GetCurrentTheme()); // 获取初始主题
+
+            if (directCallbackInitialized.compareAndSet(false, true)) {
+                SetDirectThemeCallback();
+            }
+
+            virtualThreadBuilder.start(() -> {
                 try {
                     StartMonitor();
                 } catch (Exception e) {
                     // 静默处理异常
+                    monitorStarted.set(false);
                 }
-            }, "AutoTheme-Monitor").start();
-            monitorStarted = true;
-            // System.out.println("AutoTheme: 主题监控已启动");
+            });
+            // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme.get() == 1 ? "深色" : "浅色"));
         }
     }
 
     public static void stopThemeMonitoring() {
-        if (monitorStarted) {
+        if (monitorStarted.compareAndSet(true, false)) {
             StopMonitor();
-            monitorStarted = false;
             // System.out.println("AutoTheme: 主题监控已停止");
         }
     }
 
     public static void initialize() {
+        if (appInitialized) {
+            return;
+        }
+
         startThemeMonitoring();
-        Runtime.getRuntime().addShutdownHook(new Thread(AutoTheme::stopThemeMonitoring));
+
+        Thread shutdownThread = virtualThreadBuilder.unstarted(AutoTheme::stopThemeMonitoring);
+        Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+        appInitialized = true;
     }
 }

@@ -10,15 +10,17 @@ import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public final class WindowOps {
-    private static final AtomicReference<Boolean> lastDark = new AtomicReference<>(false); // 上次应用的主题状态
-    private static final AtomicLong lastHandle = new AtomicLong(0);
+    private static final ThreadLocal<Long> lastHandle = ThreadLocal.withInitial(() -> 0L);
+
+    private static final AtomicReference<Boolean> lastDark = new AtomicReference<>(null); // 初始为null，确保首次应用
 
     private static final AtomicBoolean themeChangeDetected = new AtomicBoolean(true); // 初始为true以便首次应用
+    private static final AtomicBoolean pendingThemeToApply = new AtomicBoolean(false);
+
     private static final AtomicBoolean jniInitialized = new AtomicBoolean(false);
 
     private static final IntByReference TRUE_REF = new IntByReference(1);
@@ -29,18 +31,21 @@ public final class WindowOps {
     private static final DwmApi DWMApiInstance =
             Native.load("dwmapi", DwmApi.class, W32APIOptions.DEFAULT_OPTIONS);
 
+    private static final Thread.Builder virtualThreadBuilder = Thread.ofVirtual().name("AutoTheme-Preload-", 0);
+
     static {
         // 预初始化指针
         TRUE_REF.getPointer();
         FALSE_REF.getPointer();
 
-        new Thread(() -> {
+        virtualThreadBuilder.start(() -> {
             try {
                 DWMApiInstance.toString();
+                // logger.fine("DWM API 预加载完成");
             } catch (Exception e) {
                 // 静默处理
             }
-        }, "AutoTheme-Preload").start();
+        });
     }
 
     /**
@@ -48,39 +53,63 @@ public final class WindowOps {
      * @param w Minecraft窗口实例
      */
     public static void apply(Window w) {
-        if (jniInitialized.get()) {
+        if (isJniInitialized()) {
             applyTheme(w);
         }
     }
 
-    /**
-     * 仅在检测到主题变化时|应用主题
-     */
     public static void applyIfNeeded(Window w) {
-        if (!jniInitialized.get()) return;
+        if (!isJniInitialized()) return;
 
-        if (themeChangeDetected.getAndSet(false)) {
-            applyTheme(w);
+        if (themeChangeDetected.get()) {
+            applyPendingTheme(w);
         }
     }
 
-    static void onThemeChanged() {
-        themeChangeDetected.set(true);
-        lastDark.set(!AutoTheme.dark()); // 强制下次|应用主题
+    private static void applyPendingTheme(Window w) {
+        if (themeChangeDetected.compareAndSet(true, false)) {
+            long handle = getWindowHandle(w);
+            if (handle != 0) {
+                boolean theme = pendingThemeToApply.get();
+                virtualThreadBuilder.start(() -> applyThemeToWindow(handle, theme));
+                // System.out.println("应用待处理主题: " + (theme ? "深色模式" : "浅色模式"));
+            }
+        }
+    }
+
+    static void onThemeChanged(boolean newDark) {
+        Boolean currentLastDark = lastDark.get();
+
+        if (currentLastDark == null || newDark != currentLastDark) {
+            lastDark.set(newDark);
+            pendingThemeToApply.set(newDark);
+            themeChangeDetected.set(true); // 标记需要应用主题
+
+            // System.out.println("主题变化检测: " + (newDark ? "深色" : "浅色") + ", 上次主题: " + (currentLastDark != null ? (currentLastDark ? "深色" : "浅色") : "null"));
+        } else {
+            // 主题未变化则清除检测标志
+            themeChangeDetected.set(false);
+            // System.out.println("主题未变化，跳过应用");
+        }
     }
 
     public static void initializeJNI() {
         if (jniInitialized.compareAndSet(false, true)) {
-            AutoTheme.GetCurrentTheme(); // 预热 JNI 调用
-            lastDark.set(!AutoTheme.dark());
+            int currentTheme = AutoTheme.GetCurrentTheme();
+            boolean isDark = (currentTheme == 1);
+            lastDark.set(isDark);
+            pendingThemeToApply.set(isDark);
+            themeChangeDetected.set(true); // 强制首次应用
+
+            // System.out.println("JNI 初始化完成，初始主题: " + (isDark ? "深色" : "浅色"));
         }
     }
 
     private static long getWindowHandle(Window w) {
-        long handle = lastHandle.get();
+        Long handle = lastHandle.get();
         if (handle == 0) {
             handle = GLFWNativeWin32.glfwGetWin32Window(w.getHandle());
-            lastHandle.compareAndSet(0, handle);
+            lastHandle.set(handle);
         }
         return handle;
     }
@@ -89,14 +118,20 @@ public final class WindowOps {
         boolean dark = AutoTheme.dark();
         Boolean currentLastDark = lastDark.get();
 
-        if (currentLastDark != null && dark == currentLastDark) {
-            return; // 主题未变化则跳过
-        }
-
-        if (lastDark.compareAndSet(currentLastDark, dark)) {
+        if (currentLastDark == null || dark != currentLastDark) {
+            if (lastDark.compareAndSet(currentLastDark, dark)) {
+                long handle = getWindowHandle(w);
+                if (handle != 0) {
+                    virtualThreadBuilder.start(() -> applyThemeToWindow(handle, dark));
+                    pendingThemeToApply.set(dark); // 同步更新待应用主题
+                    // System.out.println("直接应用主题: " + (dark ? "深色模式" : "浅色模式"));
+                }
+            }
+        } else {
             long handle = getWindowHandle(w);
             if (handle != 0) {
-                applyThemeToWindow(handle, dark);
+                virtualThreadBuilder.start(() -> applyThemeToWindow(handle, dark));
+                // System.out.println("强制首次应用主题: " + (dark ? "深色模式" : "浅色模式"));
             }
         }
     }
@@ -104,12 +139,17 @@ public final class WindowOps {
     private static void applyThemeToWindow(long handle, boolean dark) {
         IntByReference ref = dark ? TRUE_REF : FALSE_REF;
         DWMApiInstance.DwmSetWindowAttribute(
+     // int result = DWMApiInstance.DwmSetWindowAttribute(
                 new WinDef.HWND(Pointer.createConstant(handle)),
                 ATTRIBUTE,
                 ref.getPointer(),
                 SIZE
         );
-        // System.out.println("窗口主题已应用: " + (dark ? "深色模式" : "浅色模式"));
+        // System.out.println("窗口主题应用: " + (dark ? "深色模式" : "浅色模式") + ", 结果代码: " + result + ", 窗口句柄: " + handle);
+    }
+
+    private static boolean isJniInitialized() {
+        return jniInitialized.get();
     }
 
     private interface DwmApi extends StdCallLibrary {

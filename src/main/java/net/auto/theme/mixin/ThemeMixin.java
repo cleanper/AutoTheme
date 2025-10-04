@@ -11,12 +11,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MinecraftClient.class)
 public class ThemeMixin {
-
     @Unique
     private boolean themeApplied = false;
 
     @Unique
-    private boolean themeInitialized = false;
+    private static boolean globalThemeInitialized = false;
 
     @Inject(
             method = "<init>",
@@ -28,13 +27,14 @@ public class ThemeMixin {
     )
     private void onWindowFieldSet(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
-        if (!themeApplied) {
-            if (!themeInitialized) {
-                WindowOps.initializeJNI();
-                AutoTheme.initialize();
-                themeInitialized = true;
-            }
 
+        if (!globalThemeInitialized) {
+            WindowOps.initializeJNI();
+            AutoTheme.initialize();
+            globalThemeInitialized = true;
+        }
+
+        if (!themeApplied) {
             WindowOps.apply(client.getWindow());
             themeApplied = true;
         }
