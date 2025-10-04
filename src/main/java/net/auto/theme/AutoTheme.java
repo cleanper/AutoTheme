@@ -2,21 +2,19 @@ package net.auto.theme;
 
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
     private static final SubmissionPublisher<Boolean> themePublisher = new SubmissionPublisher<>();
 
-    private static final Thread.Builder virtualThreadBuilder = Thread.ofVirtual().name("AutoTheme-Virtual-", 0);
-
-    private static final AtomicInteger currentSystemTheme = new AtomicInteger(0);
+    private static volatile int currentSystemTheme = 0;
 
     private static volatile boolean appInitialized = false;
 
-    private static final AtomicBoolean monitorStarted = new AtomicBoolean(false);
-    private static final AtomicBoolean directCallbackInitialized = new AtomicBoolean(false);
+    private static volatile boolean monitorStarted = false;
+    private static volatile boolean directCallbackInitialized = false;
+
+    private static final Object INIT_LOCK = new Object();
 
     static {
         loadLibrary();
@@ -57,48 +55,69 @@ public final class AutoTheme {
     }
 
     public static boolean dark() {
-        return currentSystemTheme.get() == 1;
+        return currentSystemTheme == 1;
     }
 
     @SuppressWarnings("unused")
     private static void onSystemThemeChanged(int newTheme) {
-        int oldTheme = currentSystemTheme.getAndSet(newTheme);
+        int oldTheme = currentSystemTheme;
 
-        if (oldTheme != newTheme) {
-            // 发布主题变化事件
-            virtualThreadBuilder.start(() -> {
-                boolean isDark = (newTheme == 1);
-                themePublisher.submit(isDark);
-                WindowOps.onThemeChanged(isDark);
-            });
-            // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色"));
+        // 如果没有变化则直接返回
+        if (oldTheme == newTheme) {
+            return;
         }
+
+        currentSystemTheme = newTheme;
+
+        boolean isDark = (newTheme == 1);
+        themePublisher.submit(isDark);
+        WindowOps.onThemeChanged(isDark);
+
+        // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色") + "，旧主题: " + (oldTheme == 1 ? "深色" : "浅色"));
     }
 
     public static void startThemeMonitoring() {
-        if (monitorStarted.compareAndSet(false, true)) {
-            currentSystemTheme.set(GetCurrentTheme()); // 获取初始主题
+        if (monitorStarted) {
+            return;
+        }
 
-            if (directCallbackInitialized.compareAndSet(false, true)) {
-                SetDirectThemeCallback();
-            }
+        synchronized (INIT_LOCK) {
+            if (!monitorStarted) {
+                currentSystemTheme = GetCurrentTheme(); // 获取初始主题
 
-            virtualThreadBuilder.start(() -> {
-                try {
-                    StartMonitor();
-                } catch (Exception e) {
-                    // 静默处理异常
-                    monitorStarted.set(false);
+                if (!directCallbackInitialized) {
+                    SetDirectThemeCallback();
+                    directCallbackInitialized = true;
                 }
-            });
-            // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme.get() == 1 ? "深色" : "浅色"));
+
+                Thread monitorThread = new Thread(() -> {
+                    try {
+                        StartMonitor();
+                    } catch (Exception e) {
+                        // 静默处理异常
+                        synchronized (INIT_LOCK) {
+                            monitorStarted = false;
+                        }
+                    }
+                }, "AutoTheme-Monitor");
+                monitorThread.setDaemon(true);
+                monitorThread.start();
+
+                monitorStarted = true;
+                // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme == 1 ? "深色" : "浅色"));
+            }
         }
     }
 
     public static void stopThemeMonitoring() {
-        if (monitorStarted.compareAndSet(true, false)) {
-            StopMonitor();
-            // System.out.println("AutoTheme: 主题监控已停止");
+        if (monitorStarted) {
+            synchronized (INIT_LOCK) {
+                if (monitorStarted) {
+                    StopMonitor();
+                    monitorStarted = false;
+                    // System.out.println("AutoTheme: 主题监控已停止");
+                }
+            }
         }
     }
 
@@ -109,7 +128,7 @@ public final class AutoTheme {
 
         startThemeMonitoring();
 
-        Thread shutdownThread = virtualThreadBuilder.unstarted(AutoTheme::stopThemeMonitoring);
+        Thread shutdownThread = new Thread(AutoTheme::stopThemeMonitoring, "AutoTheme-Shutdown");
         Runtime.getRuntime().addShutdownHook(shutdownThread);
 
         appInitialized = true;

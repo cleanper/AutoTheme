@@ -6,7 +6,7 @@
 | <span style="color:#2E86AB">**生命周期管理**</span> | <span style="color:#E74C3C">手动，易出错</span>         | <span style="color:#27AE60">自动（通过 Arena）</span> |
 | <span style="color:#2E86AB">**可维护性**</span>   | <span style="color:#E74C3C">低</span>              | <span style="color:#27AE60">高</span>            |
 
-[问题] 为了运行|我们需要使用Java22|且还需要添加额外参数以启用这个实验性功能
+[问题] 为了运行|目前我们需要使用Java22+|且还需要添加额外参数以启用这个实验性功能
 
       似乎使用后启动速度更慢了[也许是我没有优化]
 
