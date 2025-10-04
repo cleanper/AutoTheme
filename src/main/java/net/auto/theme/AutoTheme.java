@@ -1,13 +1,12 @@
 package net.auto.theme;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.StampedLock;
+import java.util.concurrent.Flow;
+import java.util.concurrent.SubmissionPublisher;
+import java.util.concurrent.atomic.AtomicStampedReference;
 
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
-    private static final List<ThemeChangeCallback> themeCallbacks = new ArrayList<>();
+    private static final SubmissionPublisher<Boolean> themePublisher = new SubmissionPublisher<>();
 
     static {
         loadLibrary();
@@ -40,44 +39,24 @@ public final class AutoTheme {
     public static native void StartMonitor(); // 启动主题监控
     public static native void StopMonitor(); // 停止主题监控
 
-    // 主题变化回调接口
-    @FunctionalInterface
-    public interface ThemeChangeCallback {
-        void onThemeChanged(boolean isDark);
-    }
-
-    // 供其他模组订阅主题变化
     @SuppressWarnings("unused")
-    public static void subscribeThemeChanges(ThemeChangeCallback callback) {
-        synchronized (themeCallbacks) {
-            themeCallbacks.add(callback);
-        }
+    public static Flow.Publisher<Boolean> themeChanges() {
+        return themePublisher;
     }
 
-    // 取消订阅主题变化
-    @SuppressWarnings("unused")
-    public static void unsubscribeThemeChanges(ThemeChangeCallback callback) {
-        synchronized (themeCallbacks) {
-            themeCallbacks.remove(callback);
-        }
-    }
-
-    private static final AtomicReference<ThemeState> currentThemeState =
-            new AtomicReference<>(new ThemeState(false, 0, 0));
-    private static final StampedLock themeLock = new StampedLock();
+    private static final AtomicStampedReference<ThemeState> currentThemeState =
+            new AtomicStampedReference<>(new ThemeState(false, 0), 0);
     private static final long CACHE_TIMEOUT = 100; // 缓存超时时间(0.1秒)
 
-    private record ThemeState(boolean isDark, long timestamp, int version) {}
+    private record ThemeState(boolean isDark, long timestamp) {}
 
     public static boolean dark() {
-        long stamp = themeLock.tryOptimisticRead();
-        ThemeState state = currentThemeState.get();
+        int[] stampHolder = new int[1];
+        ThemeState state = currentThemeState.get(stampHolder);
+        long currentTime = System.currentTimeMillis();
 
-        if (themeLock.validate(stamp)) {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - state.timestamp <= CACHE_TIMEOUT) {
-                return state.isDark;
-            }
+        if (currentTime - state.timestamp() <= CACHE_TIMEOUT) {
+            return state.isDark();
         }
 
         return updateThemeCache();
@@ -87,44 +66,30 @@ public final class AutoTheme {
         long currentTime = System.currentTimeMillis();
         int result = GetCurrentTheme();
         boolean boolResult = (result == 1);
-        ThemeState newState = new ThemeState(boolResult, currentTime, 0);
+        ThemeState newState = new ThemeState(boolResult, currentTime);
 
-        long stamp = themeLock.writeLock();
-        try {
-            currentThemeState.set(newState);
-        } finally {
-            themeLock.unlockWrite(stamp);
-        }
+        int[] oldStamp = new int[1];
+        ThemeState oldState;
+        do {
+            oldState = currentThemeState.get(oldStamp);
+            if (oldState.isDark() == boolResult &&
+                    (currentTime - oldState.timestamp()) <= CACHE_TIMEOUT) {
+                return boolResult;
+            }
+        } while (!currentThemeState.compareAndSet(oldState, newState, oldStamp[0], oldStamp[0] + 1));
+
         return boolResult;
     }
 
     static void notifyThemeChanged() {
-        // 使缓存立即失效
-        long stamp = themeLock.writeLock();
-        try {
-            currentThemeState.set(new ThemeState(false, 0, 0));
-        } finally {
-            themeLock.unlockWrite(stamp);
-        }
+        int[] stampHolder = new int[1];
+        ThemeState current = currentThemeState.get(stampHolder);
+        ThemeState newState = new ThemeState(false, 0);
+        currentThemeState.compareAndSet(current, newState, stampHolder[0], stampHolder[0] + 1);
 
         // 发布主题变化事件
         boolean isDark = dark();
-
-        ThemeChangeCallback[] callbacks;
-        synchronized (themeCallbacks) {
-            if (themeCallbacks.isEmpty()) {
-                return;
-            }
-            callbacks = themeCallbacks.toArray(new ThemeChangeCallback[0]);
-        }
-
-        for (ThemeChangeCallback callback : callbacks) {
-            try {
-                callback.onThemeChanged(isDark);
-            } catch (Exception e) {
-                // 静默处理异常，避免影响其他回调
-            }
-        }
+        themePublisher.submit(isDark);
 
         WindowOps.onThemeChanged();
     }

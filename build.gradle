@@ -1,13 +1,13 @@
 plugins {
-    id 'fabric-loom' version "1.12.0-alpha.26" // 1.11-SNAPSHOT
+    id 'fabric-loom' version "1.12.0-alpha.27" // 1.11-SNAPSHOT
 }
 
 repositories {}
 
 dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 }
 
 tasks.withType(JavaCompile).configureEach {
