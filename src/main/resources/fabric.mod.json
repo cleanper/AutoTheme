@@ -15,8 +15,8 @@
 		"autotheme.mixins.json"
 	],
 	"depends": {
-		"fabricloader": ">=0.17.2",
-		"minecraft": ">=1.17 <=1.21.10-rc1",
+		"fabricloader": ">=0.17.3",
+		"minecraft": ">=1.17 <=1.21.11-alpha.25.41.a",
 		"java": ">=21"
 	}
 }
