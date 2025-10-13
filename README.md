@@ -26,13 +26,13 @@
 
 - Minecraft 1.17-25w41a
 + Java21+
-- Fabric Loader [**最新版本**]
+- FabricLoader [**最新版本**]
 
 ---
 
 ## 如何安装本模组？
 
-1. 安装FabricLoader最新版本
+1. 安装 [FabricLoader] 最新版本
 2. 将本模组放入整合包目录下`mods\`文件夹内
 
 ---
