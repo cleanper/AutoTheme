@@ -1,8 +1,3 @@
-#-------------------------------------------------------------------------------#
-#            Discover all capabilities of Qodana in our documentation           #
-#             https://www.jetbrains.com/help/qodana/about-qodana.html           #
-#-------------------------------------------------------------------------------#
-
 name: Qodana
 on:
   workflow_dispatch:
@@ -38,3 +33,5 @@ jobs:
           upload-result: false
           # quick-fixes available in Ultimate and Ultimate Plus plans
           push-fixes: 'none'
+          # Specify the image directly in the action
+          image: jetbrains/qodana-jvm-community:2025.2
