@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - 1.14-1.14.4
 
 jobs:
   qodana:
