@@ -25,11 +25,6 @@ profile:
 
 projectJDK: "21" #(Applied in CI/CD pipeline)
 
-cache:
-  enabled: true
-  path: .qodana/cache
-  compression: true
-
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
 #bootstrap: sh ./prepare-qodana.sh
 
