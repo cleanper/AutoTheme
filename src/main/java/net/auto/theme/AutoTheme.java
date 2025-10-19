@@ -45,6 +45,7 @@ public final class AutoTheme {
     public static native int GetCurrentTheme(); // 获取当前主题状态 (0=浅色, 1=深色)
 
     public static native void StartMonitor(); // 启动主题监控
+
     public static native void StopMonitor(); // 停止主题监控
 
     private static native void SetDirectThemeCallback();
@@ -73,7 +74,8 @@ public final class AutoTheme {
         themePublisher.submit(isDark);
         WindowOps.onThemeChanged(isDark);
 
-        // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色") + "，旧主题: " + (oldTheme == 1 ? "深色" : "浅色"));
+        // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色") + "，旧主题: " + (oldTheme == 1
+        // ? "深色" : "浅色"));
     }
 
     public static void startThemeMonitoring() {
@@ -90,16 +92,18 @@ public final class AutoTheme {
                     directCallbackInitialized = true;
                 }
 
-                Thread monitorThread = new Thread(() -> {
-                    try {
-                        StartMonitor();
-                    } catch (Exception e) {
-                        // 静默处理异常
-                        synchronized (INIT_LOCK) {
-                            monitorStarted = false;
-                        }
-                    }
-                }, "AutoTheme-Monitor");
+                Thread monitorThread = new Thread(
+                        () -> {
+                            try {
+                                StartMonitor();
+                            } catch (Exception e) {
+                                // 静默处理异常
+                                synchronized (INIT_LOCK) {
+                                    monitorStarted = false;
+                                }
+                            }
+                        },
+                        "AutoTheme-Monitor");
                 monitorThread.setDaemon(true);
                 monitorThread.start();
 

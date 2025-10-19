@@ -19,12 +19,11 @@ public class ThemeMixin {
 
     @Inject(
             method = "<init>",
-            at = @At(
-                    value = "FIELD",
-                    target = "Lnet/minecraft/client/MinecraftClient;window:Lnet/minecraft/client/util/Window;",
-                    shift = At.Shift.AFTER
-            )
-    )
+            at =
+                    @At(
+                            value = "FIELD",
+                            target = "Lnet/minecraft/client/MinecraftClient;window:Lnet/minecraft/client/util/Window;",
+                            shift = At.Shift.AFTER))
     private void onWindowFieldSet(CallbackInfo ci) {
         MinecraftClient client = (MinecraftClient) (Object) this;
 
