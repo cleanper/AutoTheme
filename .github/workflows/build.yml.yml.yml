@@ -28,8 +28,6 @@ jobs:
         id: ver
         run: echo "VERSION=$(date +%Y%m%d).${{ github.run_number }}" >> $GITHUB_OUTPUT
       - run: ./gradlew spotlessApply build --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx5g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
-        env:
-          GRADLE_ENTERPRISE_TERMS_OF_USE_AGREE: yes
       - uses: softprops/action-gh-release@v2.4.1
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
         with:
