@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ThemeMixin {
     @Unique
     private static boolean globalThemeInitialized = false;
+
     @Unique
     private boolean firstRender = true;
 

@@ -1,5 +1,7 @@
 plugins {
     id 'fabric-loom' version "1.12.0-alpha.41" // 1.11-SNAPSHOT
+    id 'com.diffplug.spotless' version '8.0.0'
+    id 'maven-publish'
 }
 
 repositories {}
@@ -10,8 +12,15 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
+spotless {
+    java {
+        palantirJavaFormat('2.39.0')
+        cleanthat()
+	.addMutator('SafeAndConsensual')
+	.addMutator('SafeButNotConsensual')
+	.addMutator('SafeButControversial')
+	.includeDraft(true) 
+    }
 }
 
 java {
@@ -19,4 +28,8 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
 }

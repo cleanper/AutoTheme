@@ -2,6 +2,7 @@ package net.auto.theme;
 
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
+import org.jetbrains.annotations.NotNull;
 
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
@@ -33,7 +34,7 @@ public final class AutoTheme {
         String os = System.getProperty("os.name").toLowerCase();
 
         if (os.contains("windows")) {
-            if (arch.contains("64") || arch.equals("amd64") || arch.equals("x86_64")) {
+            if (arch.contains("64") || "amd64".equals(arch) || "x86_64".equals(arch)) {
                 return "AutoTheme_x64"; // 若系统为64位架构加载X64的库
             } else if (arch.contains("86")) {
                 return "AutoTheme_x86"; // 若系统为32位架构加载X86的库
@@ -45,6 +46,7 @@ public final class AutoTheme {
     public static native int GetCurrentTheme(); // 获取当前主题状态 (0=浅色, 1=深色)
 
     public static native void StartMonitor(); // 启动主题监控
+
     public static native void StopMonitor(); // 停止主题监控
 
     private static native void SetDirectThemeCallback();
@@ -58,7 +60,7 @@ public final class AutoTheme {
         return currentSystemTheme == 1;
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "CommentedOutCode"})
     private static void onSystemThemeChanged(int newTheme) {
         int oldTheme = currentSystemTheme;
 
@@ -73,7 +75,8 @@ public final class AutoTheme {
         themePublisher.submit(isDark);
         WindowOps.onThemeChanged(isDark);
 
-        // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色") + "，旧主题: " + (oldTheme == 1 ? "深色" : "浅色"));
+        // System.out.println("AutoTheme: 收到系统主题变化通知，新主题: " + (newTheme == 1 ? "深色" : "浅色") + "，旧主题: " + (oldTheme == 1
+        // ? "深色" : "浅色"));
     }
 
     public static void startThemeMonitoring() {
@@ -90,7 +93,18 @@ public final class AutoTheme {
                     directCallbackInitialized = true;
                 }
 
-                Thread monitorThread = new Thread(() -> {
+                Thread monitorThread = getMonitorThread();
+                monitorThread.start();
+
+                monitorStarted = true;
+                // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme == 1 ? "深色" : "浅色"));
+            }
+        }
+    }
+
+    private static @NotNull Thread getMonitorThread() {
+        Thread monitorThread = new Thread(
+                () -> {
                     try {
                         StartMonitor();
                     } catch (Exception e) {
@@ -99,14 +113,10 @@ public final class AutoTheme {
                             monitorStarted = false;
                         }
                     }
-                }, "AutoTheme-Monitor");
-                monitorThread.setDaemon(true);
-                monitorThread.start();
-
-                monitorStarted = true;
-                // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme == 1 ? "深色" : "浅色"));
-            }
-        }
+                },
+                "AutoTheme-Monitor");
+        monitorThread.setDaemon(true);
+        return monitorThread;
     }
 
     public static void stopThemeMonitoring() {

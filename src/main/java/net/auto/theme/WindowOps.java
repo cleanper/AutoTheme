@@ -32,7 +32,8 @@ public final class WindowOps {
     private static final DwmApi DWMApiInstance =
             Native.loadLibrary("dwmapi", DwmApi.class, W32APIOptions.DEFAULT_OPTIONS);
 
-    private static final Thread.Builder threadBuilder = Thread.ofPlatform().daemon(true).name("AutoTheme-WindowOps-", 0);
+    private static final Thread.Builder threadBuilder =
+            Thread.ofPlatform().daemon(true).name("AutoTheme-WindowOps-", 0);
 
     static {
         // 预初始化指针
@@ -84,6 +85,7 @@ public final class WindowOps {
         }
     }
 
+    @SuppressWarnings("CommentedOutCode")
     static void onThemeChanged(boolean newDark) {
         Boolean currentLastDark = lastDark;
 
@@ -99,7 +101,8 @@ public final class WindowOps {
             themeChangeDetected = true;
         }
 
-        // System.out.println("主题变化检测: " + (newDark ? "深色" : "浅色") + ", 上次主题: " + (currentLastDark != null ? (currentLastDark ? "深色" : "浅色") : "null"));
+        // System.out.println("主题变化检测: " + (newDark ? "深色" : "浅色") + ", 上次主题: " + (currentLastDark != null ?
+        // (currentLastDark ? "深色" : "浅色") : "null"));
     }
 
     public static void initializeJNI() {
@@ -154,14 +157,15 @@ public final class WindowOps {
     }
 
     private static void applyThemeToWindow(long handle, boolean dark) {
-        Pointer attrPtr = dark ? TRUE_PTR : FALSE_PTR;
+        Pointer attrPtr;
+        if (dark) {
+            attrPtr = TRUE_PTR;
+        } else {
+            attrPtr = FALSE_PTR;
+        }
         DWMApiInstance.DwmSetWindowAttribute(
                 // int result = DWMApiInstance.DwmSetWindowAttribute(
-                new WinDef.HWND(Pointer.createConstant(handle)),
-                ATTRIBUTE,
-                attrPtr,
-                SIZE
-        );
+                new WinDef.HWND(Pointer.createConstant(handle)), ATTRIBUTE, attrPtr, SIZE);
         // System.out.println("窗口主题应用: " + (dark ? "深色模式" : "浅色模式") + ", 结果代码: " + result + ", 窗口句柄: " + handle);
     }
 
@@ -172,10 +176,6 @@ public final class WindowOps {
     private interface DwmApi extends StdCallLibrary {
         @SuppressWarnings("UnusedReturnValue")
         int DwmSetWindowAttribute(
-                WinDef.HWND hwnd,
-                WinDef.DWORD dwAttribute,
-                Pointer pvAttribute,
-                WinDef.DWORD cbAttribute
-        );
+                WinDef.HWND hwnd, WinDef.DWORD dwAttribute, Pointer pvAttribute, WinDef.DWORD cbAttribute);
     }
 }
