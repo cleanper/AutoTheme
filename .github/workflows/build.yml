@@ -9,102 +9,28 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    env:
-      GRADLE_OPTS: "-Dorg.gradle.daemon.idletimeout=300"
-    outputs:
-      build-files: ${{ steps.prepare.outputs.build-files }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'liberica'
-          cache: 'gradle'
-
-      - uses: gradle/actions/wrapper-validation@v4
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
+          java-version: 21
+          distribution: jdkfile
+          jdkFile: https://download.bell-sw.com/java/21.0.8+12/bellsoft-jdk21.0.8+12-linux-amd64.tar.gz
+      - uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            ~/.gradle/loom-cache
-            .gradle/configuration-cache
-          key: gradle-all-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', '**/*.gradle*', 'gradle.properties') }}
-          restore-keys: gradle-all-${{ runner.os }}-
-          lookup-only: true
-
-      - name: Build with Gradle
-        run: |
-          ./gradlew build --daemon --parallel --build-cache --configure-on-demand --configuration-cache \
-          --max-workers=8 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
-
-      - name: Prepare artifacts
-        id: prepare
-        run: |
-          echo "build-files=build/libs" >> $GITHUB_OUTPUT
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+          cache-write-only: true
+          gradle-home-cache-cleanup: true
+      - run: gradle build spotlessCheck --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
+      - uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
         with:
-          name: build-output
-          path: build/libs/
-          retention-days: 10
-
-  release:
-    runs-on: ubuntu-22.04
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
-
-    concurrency:
-      group: release-${{ github.ref }}
-      cancel-in-progress: false
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: build/libs/
-
-      - name: Compute version
-        id: version
-        run: |
-          DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          VERSION="${DATE}.${{ github.run_number }}"
-          FULL_VERSION="AutoTheme+${VERSION}"
-
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Install pigz
-        run: sudo apt-get update -qq && sudo apt-get install -qq pigz
-
-      - name: Pack artifacts
-        run: |
-          cd build/libs
-          tar -cf - . | pigz -6 -p 4 > "../../${{ env.FULL_VERSION }}.zip"
-          tar -cf - . | pigz -6 -p 4 > "../../${{ env.FULL_VERSION }}.tar.gz"
-
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.FULL_VERSION }}
-          name: ${{ env.FULL_VERSION }}
-          files: |
-            ${{ env.FULL_VERSION }}.zip
-            ${{ env.FULL_VERSION }}.tar.gz
+          tag_name: AutoTheme+$(date +%Y%m%d).${{ github.run_number }}
+          name: AutoTheme+$(date +%Y%m%d).${{ github.run_number }}
+          files: build/libs/*
           generate_release_notes: true
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false
