@@ -16,8 +16,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GlCommandEncoder.class)
 public abstract class GlCommandEncoderMixin {
 
-    @Shadow @Nullable private RenderPipeline currentPipeline;
-    @Unique private static int currentBlendEquation = GL14.GL_FUNC_ADD;
+    @Shadow
+    @Nullable
+    private RenderPipeline currentPipeline;
+
+    @Unique
+    private static int currentBlendEquation = GL14.GL_FUNC_ADD;
 
     @Inject(method = "setPipelineAndApplyState", at = @At(value = "HEAD"))
     public void onSetPipelineAndApplyState(RenderPipeline newPipeline, CallbackInfo ci) {

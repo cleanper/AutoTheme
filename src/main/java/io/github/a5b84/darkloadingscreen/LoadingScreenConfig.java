@@ -5,10 +5,8 @@ public class LoadingScreenConfig {
     public final float bgR, bgG, bgB;
     public final float logoR, logoG, logoB;
     public final float fadeInMs, fadeOutMs;
-
     public final float bgMinusLogoR, bgMinusLogoG, bgMinusLogoB;
     public final float logoMinusBgR, logoMinusBgG, logoMinusBgB;
-
     public final int barWithAlpha, barBgWithAlpha, borderWithAlpha;
     public static final int ALPHA_MASK = 0xff000000;
 
