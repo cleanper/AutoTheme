@@ -13,7 +13,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.daemon.idletimeout=300"
     outputs:
       build-files: ${{ steps.prepare.outputs.build-files }}
     steps:
@@ -22,7 +24,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'temurin'
+          distribution: 'liberica'
           cache: 'gradle'
 
       - uses: gradle/actions/wrapper-validation@v4
@@ -34,16 +36,15 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             ~/.gradle/loom-cache
-            ~/.gradle/configuration-cache
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/gradle.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+            .gradle/configuration-cache
+          key: gradle-all-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', '**/*.gradle*', 'gradle.properties') }}
+          restore-keys: gradle-all-${{ runner.os }}-
+          lookup-only: true
 
       - name: Build with Gradle
-        run: ./gradlew build --no-daemon --parallel --build-cache --configure-on-demand --configuration-cache
+        run: |
+          ./gradlew build --daemon --parallel --build-cache --configure-on-demand --configuration-cache \
+          --max-workers=8 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
 
       - name: Prepare artifacts
         id: prepare
@@ -58,9 +59,9 @@ jobs:
           retention-days: 10
 
   release:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
 
     concurrency:
       group: release-${{ github.ref }}
@@ -74,20 +75,11 @@ jobs:
           name: build-output
           path: build/libs/
 
-      - name: Compute next build number
+      - name: Compute version
         id: version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
           DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          PREFIX="Build.${DATE}"
-
-          MAX=$(gh api repos/${{ github.repository }}/releases --paginate \
-                --jq '[.[].tag_name | select(startswith("AutoTheme+ $env.PREFIX)"))] | map(split(".")[-1] | tonumber) | max // 0')
-
-          NEXT=$((MAX + 1))
-          VERSION="${PREFIX}.${NEXT}"
+          VERSION="${DATE}.${{ github.run_number }}"
           FULL_VERSION="AutoTheme+${VERSION}"
 
           echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -95,15 +87,14 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Install pigz
+        run: sudo apt-get update -qq && sudo apt-get install -qq pigz
+
       - name: Pack artifacts
         run: |
           cd build/libs
-          zip -9 -r "../../${{ env.FULL_VERSION }}.zip" *
-
-      - name: Pack source
-        run: |
-          git archive --format=zip \
-            --output="${{ env.FULL_VERSION }}-Source.zip" HEAD
+          tar -cf - . | pigz -6 -p 4 > "../../${{ env.FULL_VERSION }}.zip"
+          tar -cf - . | pigz -6 -p 4 > "../../${{ env.FULL_VERSION }}.tar.gz"
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -112,7 +103,8 @@ jobs:
           name: ${{ env.FULL_VERSION }}
           files: |
             ${{ env.FULL_VERSION }}.zip
-            ${{ env.FULL_VERSION }}-Source.zip
+            ${{ env.FULL_VERSION }}.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
