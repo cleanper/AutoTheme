@@ -15,11 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch Liberica Performance JDK
+        run: curl -L -O https://download.bell-sw.com/java/21.0.8+12/bellsoft-jdk21.0.8+12-linux-amd64.tar.gz
       - uses: actions/setup-java@v4
         with:
           java-version: 21
           distribution: jdkfile
-          jdkFile: https://download.bell-sw.com/java/21.0.8+12/bellsoft-jdk21.0.8+12-linux-amd64.tar.gz
+          jdkFile: bellsoft-jdk21.0.8+12-linux-amd64.tar.gz
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-write-only: true
