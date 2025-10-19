@@ -22,16 +22,21 @@ jobs:
           java-version: 21
           distribution: jdkfile
           jdkFile: bellsoft-jdk21.0.8+12-linux-amd64.tar.gz
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v3.1.0
         with:
           cache-write-only: true
           gradle-home-cache-cleanup: true
-      - run: gradle build spotlessCheck --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
+      - name: Generate version
+        id: ver
+        run: echo "VERSION=$(date +%Y%m%d).${{ github.run_number }}" >> $GITHUB_OUTPUT
+      - run: gradle spotlessApply build --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx5g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
+        env:
+          GRADLE_ENTERPRISE_TERMS_OF_USE_AGREE: yes
       - uses: softprops/action-gh-release@v2
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
         with:
-          tag_name: AutoTheme+$(date +%Y%m%d).${{ github.run_number }}
-          name: AutoTheme+$(date +%Y%m%d).${{ github.run_number }}
+          tag_name: AutoTheme+${{ steps.ver.outputs.VERSION }}
+          name: AutoTheme+${{ steps.ver.outputs.VERSION }}
           files: build/libs/*
           generate_release_notes: true
           draft: false
