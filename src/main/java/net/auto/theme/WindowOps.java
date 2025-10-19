@@ -84,6 +84,7 @@ public final class WindowOps {
         }
     }
 
+    @SuppressWarnings("CommentedOutCode")
     static void onThemeChanged(boolean newDark) {
         Boolean currentLastDark = lastDark;
 

@@ -2,6 +2,7 @@ package net.auto.theme;
 
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
+import org.jetbrains.annotations.NotNull;
 
 public final class AutoTheme {
     private static boolean libraryLoaded = false;
@@ -59,7 +60,7 @@ public final class AutoTheme {
         return currentSystemTheme == 1;
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "CommentedOutCode"})
     private static void onSystemThemeChanged(int newTheme) {
         int oldTheme = currentSystemTheme;
 
@@ -92,25 +93,30 @@ public final class AutoTheme {
                     directCallbackInitialized = true;
                 }
 
-                Thread monitorThread = new Thread(
-                        () -> {
-                            try {
-                                StartMonitor();
-                            } catch (Exception e) {
-                                // 静默处理异常
-                                synchronized (INIT_LOCK) {
-                                    monitorStarted = false;
-                                }
-                            }
-                        },
-                        "AutoTheme-Monitor");
-                monitorThread.setDaemon(true);
+                Thread monitorThread = getMonitorThread();
                 monitorThread.start();
 
                 monitorStarted = true;
                 // System.out.println("AutoTheme: 主题监控已启动，初始主题: " + (currentSystemTheme == 1 ? "深色" : "浅色"));
             }
         }
+    }
+
+    private static @NotNull Thread getMonitorThread() {
+        Thread monitorThread = new Thread(
+                () -> {
+                    try {
+                        StartMonitor();
+                    } catch (Exception e) {
+                        // 静默处理异常
+                        synchronized (INIT_LOCK) {
+                            monitorStarted = false;
+                        }
+                    }
+                },
+                "AutoTheme-Monitor");
+        monitorThread.setDaemon(true);
+        return monitorThread;
     }
 
     public static void stopThemeMonitoring() {
