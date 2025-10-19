@@ -15,6 +15,11 @@ dependencies {
 spotless {
     java {
         palantirJavaFormat('2.39.0')
+        cleanthat()
+	.addMutator('SafeAndConsensual')
+	.addMutator('SafeButNotConsensual')
+	.addMutator('SafeButControversial')
+	.includeDraft(true) 
     }
 }
 

@@ -33,7 +33,7 @@ public final class AutoTheme {
         String os = System.getProperty("os.name").toLowerCase();
 
         if (os.contains("windows")) {
-            if (arch.contains("64") || arch.equals("amd64") || arch.equals("x86_64")) {
+            if (arch.contains("64") || "amd64".equals(arch) || "x86_64".equals(arch)) {
                 return "AutoTheme_x64"; // 若系统为64位架构加载X64的库
             } else if (arch.contains("86")) {
                 return "AutoTheme_x86"; // 若系统为32位架构加载X86的库

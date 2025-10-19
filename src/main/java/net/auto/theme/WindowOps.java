@@ -155,7 +155,12 @@ public final class WindowOps {
     }
 
     private static void applyThemeToWindow(long handle, boolean dark) {
-        Pointer attrPtr = dark ? TRUE_PTR : FALSE_PTR;
+        Pointer attrPtr;
+        if (dark) {
+            attrPtr = TRUE_PTR;
+        } else {
+            attrPtr = FALSE_PTR;
+        }
         DWMApiInstance.DwmSetWindowAttribute(
                 // int result = DWMApiInstance.DwmSetWindowAttribute(
                 new WinDef.HWND(Pointer.createConstant(handle)), ATTRIBUTE, attrPtr, SIZE);
