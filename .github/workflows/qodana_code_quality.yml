@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - 1.15-1.16.5
 
 jobs:
   qodana:
@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2025.2
+        uses: JetBrains/qodana-action@v2025.2.1
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
         with:
