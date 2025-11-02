@@ -15,25 +15,35 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+
       - name: Fetch GraalVM JDK
-        run: curl -L -O https://download.oracle.com/graalvm/21/latest/graalvm-jdk-21_linux-x64_bin.tar.gz
+        run: curl -L -O https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.1/graalvm-community-jdk-25.0.1_linux-x64_bin.tar.gz
       - uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: jdkfile
-          jdkFile: graalvm-jdk-21_linux-x64_bin.tar.gz
+          jdkFile: graalvm-community-jdk-25.0.1_linux-x64_bin.tar.gz
+
       - uses: gradle/actions/setup-gradle@v5
       - run: chmod +x ./gradlew
+
       - name: Generate version
         id: ver
         run: echo "VERSION=$(date +%Y%m%d).${{ github.run_number }}" >> $GITHUB_OUTPUT
-      - run: ./gradlew spotlessApply build --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx5g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
+      - name: JVM build
+        run: ./gradlew spotlessApply build --build-cache --scan --parallel --configure-on-demand --max-workers=8 -Dorg.gradle.jvmargs="-Xmx5g -XX:+UseG1GC -XX:+UseStringDeduplication -XX:TieredStopAtLevel=1"
+
+      - name: Native executable
+        run: ./gradlew build -Dquarkus.package.type=native -Dquarkus.native.container-build=true --no-daemon
+
       - uses: softprops/action-gh-release@v2.4.1
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]')
         with:
           tag_name: AutoTheme+${{ steps.ver.outputs.VERSION }}
           name: AutoTheme+${{ steps.ver.outputs.VERSION }}
-          files: build/libs/*
+          files: |
+            build/libs/*
+            build/*-runner
           generate_release_notes: true
           draft: false
           prerelease: false

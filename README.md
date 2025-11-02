@@ -24,7 +24,7 @@
 
 ## 本模组需要的依赖？
 
-- Minecraft 1.17-25w43a
+- Minecraft 1.17-25w44a
 + Java21+
 - FabricLoader [**最新版本**]
 
